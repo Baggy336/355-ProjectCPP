@@ -7,8 +7,6 @@
 #include "Components/InputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
-#include "DrawDebugHelpers.h"
-#include "Interactable.h"
 #include "GameFramework/SpringArmComponent.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -16,8 +14,6 @@
 
 AFunProjectCharacter::AFunProjectCharacter()
 {
-	projectileToSpawn = nullptr;
-
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
@@ -56,7 +52,6 @@ AFunProjectCharacter::AFunProjectCharacter()
 
 void AFunProjectCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
-
 	// Set up gameplay key bindings
 	check(PlayerInputComponent);
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
@@ -73,38 +68,34 @@ void AFunProjectCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
 	PlayerInputComponent->BindAxis("LookUpRate", this, &AFunProjectCharacter::LookUpAtRate);
 
-	PlayerInputComponent->BindAction("Interact", EInputEvent::IE_Pressed, this, &AFunProjectCharacter::OnInteract);
-	PlayerInputComponent->BindAction("Shoot", EInputEvent::IE_Pressed, this, &AFunProjectCharacter::OnShoot);
+	// handle touch devices
+	PlayerInputComponent->BindTouch(IE_Pressed, this, &AFunProjectCharacter::TouchStarted);
+	PlayerInputComponent->BindTouch(IE_Released, this, &AFunProjectCharacter::TouchStopped);
+
+	// VR headset functionality
+	PlayerInputComponent->BindAction("ResetVR", IE_Pressed, this, &AFunProjectCharacter::OnResetVR);
 }
 
-void AFunProjectCharacter::OnInteract() {
 
-	if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 3, FColor::Green, "Hello world!");
-
-	FHitResult hit;
-	FVector start = GetActorLocation();
-	FVector end = start + GetActorForwardVector() * 200;
-
-	DrawDebugLine(GetWorld(), start, end, FColor::Red, false, 1);
-
-	if (GetWorld()->LineTraceSingleByChannel(hit, start, end, ECollisionChannel::ECC_Visibility)) {
-		if (IInteractable* obj = Cast<IInteractable>(hit.Actor)) {
-			obj->Interact();
-		}
-	}
-
+void AFunProjectCharacter::OnResetVR()
+{
+	// If FunProject is added to a project via 'Add Feature' in the Unreal Editor the dependency on HeadMountedDisplay in FunProject.Build.cs is not automatically propagated
+	// and a linker error will result.
+	// You will need to either:
+	//		Add "HeadMountedDisplay" to [YourProject].Build.cs PublicDependencyModuleNames in order to build successfully (appropriate if supporting VR).
+	// or:
+	//		Comment or delete the call to ResetOrientationAndPosition below (appropriate if not supporting VR)
+	UHeadMountedDisplayFunctionLibrary::ResetOrientationAndPosition();
 }
 
-void AFunProjectCharacter::OnShoot() {
-	// spawn objects
-	if (projectileToSpawn) {
-		//FVector pos = GetActorLocation() + GetActorTransform().TransformVector(FVector::ForwardVector * 100);
+void AFunProjectCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
+{
+		Jump();
+}
 
-		// Does the same as above, just shorter.
-		FVector pos = GetActorLocation() + GetActorRotation().Vector() * 100;
-
-		GetWorld()->SpawnActor<AActor>(projectileToSpawn, pos, GetActorRotation());
-	}
+void AFunProjectCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVector Location)
+{
+		StopJumping();
 }
 
 void AFunProjectCharacter::TurnAtRate(float Rate)
